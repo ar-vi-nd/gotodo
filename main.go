@@ -1,13 +1,18 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type ToDo struct {
@@ -15,6 +20,28 @@ type ToDo struct {
 	Description string             `json:"description" bson:"description"`
 	Title       string             `json:"title" bson:"title"`
 	Completed   bool               `json:"completed" bson:"completed"`
+}
+
+var client *mongo.Client
+var todoCollection *mongo.Collection
+
+func InitializeMongoDB() {
+	var err error
+	client, err = mongo.NewClient(options.Client().ApplyURI("mongodb+srv://igaming:hCDmJeZUHD4mcm1y@cluster0.g5mbz7u.mongodb.net/igaming"))
+	if err != nil {
+		log.Fatalf("Failed to create MongoDB client: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err = client.Connect(ctx)
+	if err != nil {
+		log.Fatalf("Failed to connect to MongoDB: %v", err)
+	}
+
+	todoCollection = client.Database("todoApp").Collection("todos")
+	fmt.Println("Connected to MongoDB!")
 }
 
 func InitializeRouter() *chi.Mux {
@@ -32,6 +59,7 @@ func InitializeRouter() *chi.Mux {
 }
 
 func main() {
+	InitializeMongoDB()
 	r := InitializeRouter()
 	log.Fatal(http.ListenAndServe(":3000", r))
 }
