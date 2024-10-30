@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -44,18 +45,64 @@ func InitializeMongoDB() {
 	fmt.Println("Connected to MongoDB!")
 }
 
+func ListToDos(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cursor, err := todoCollection.Find(ctx, bson.M{})
+	if err != nil {
+		log.Printf("Error finding todos: %v", err)
+		http.Error(w, "Could not fetch todos", http.StatusInternalServerError)
+		return
+	}
+	defer cursor.Close(ctx)
+
+	var todos []ToDo
+	if err = cursor.All(ctx, &todos); err != nil {
+		log.Printf("Error decoding todos: %v", err)
+		http.Error(w, "Error reading todos", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(todos)
+}
+
+func CreateToDo(w http.ResponseWriter, r *http.Request) {
+	var newToDo ToDo
+	if err := json.NewDecoder(r.Body).Decode(&newToDo); err != nil {
+		log.Printf("Error decoding request body: %v", err)
+		http.Error(w, "Invalid input", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	newToDo.ID = primitive.NewObjectID()
+	_, err := todoCollection.InsertOne(ctx, newToDo)
+	if err != nil {
+		log.Printf("Error inserting todo: %v", err)
+		http.Error(w, "Could not create todo", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(newToDo)
+}
+
 func InitializeRouter() *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 
 	r.Route("/todos", func(r chi.Router) {
-		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode("hello World")
-		})
+		r.Get("/", ListToDos)
+		r.Post("/", CreateToDo)
+
 	})
 
 	return r
+
 }
 
 func main() {
