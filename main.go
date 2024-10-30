@@ -91,6 +91,30 @@ func CreateToDo(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(newToDo)
 }
 
+func GetToDo(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		log.Printf("Invalid ID format: %v", err)
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	var toDo ToDo
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err = todoCollection.FindOne(ctx, bson.M{"_id": objID}).Decode(&toDo)
+	if err != nil {
+		log.Printf("Error finding todo: %v", err)
+		http.Error(w, "To-do not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(toDo)
+}
+
 func InitializeRouter() *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -98,6 +122,7 @@ func InitializeRouter() *chi.Mux {
 	r.Route("/todos", func(r chi.Router) {
 		r.Get("/", ListToDos)
 		r.Post("/", CreateToDo)
+		r.Get("/{id}", GetToDo)
 
 	})
 
