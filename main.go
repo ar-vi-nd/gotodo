@@ -115,6 +115,38 @@ func GetToDo(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(toDo)
 }
 
+func UpdateToDo(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		log.Printf("Invalid ID format: %v", err)
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	var updatedToDo map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&updatedToDo); err != nil {
+		log.Printf("Error decoding request body: %v", err)
+		http.Error(w, "Invalid input", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	update := bson.M{"$set": updatedToDo}
+
+	_, err = todoCollection.UpdateOne(ctx, bson.M{"_id": objID}, update)
+	if err != nil {
+		log.Printf("Error updating todo: %v", err)
+		http.Error(w, "Could not update todo", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(updatedToDo)
+}
+
 func InitializeRouter() *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -123,6 +155,7 @@ func InitializeRouter() *chi.Mux {
 		r.Get("/", ListToDos)
 		r.Post("/", CreateToDo)
 		r.Get("/{id}", GetToDo)
+		r.Patch("/{id}", UpdateToDo)
 
 	})
 
