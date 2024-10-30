@@ -147,6 +147,33 @@ func UpdateToDo(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(updatedToDo)
 }
 
+func DeleteToDo(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		log.Printf("Invalid ID format: %v", err)
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result, err := todoCollection.DeleteOne(ctx, bson.M{"_id": objID})
+	if err != nil || result.DeletedCount == 0 {
+		log.Printf("Error deleting todo or todo not found: %v", err)
+		http.Error(w, "To-do not found", http.StatusNotFound)
+		return
+	}
+
+	response := map[string]interface{}{
+		"message": "To-do deleted successfully",
+		"status":  "success",
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
 func InitializeRouter() *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -156,6 +183,7 @@ func InitializeRouter() *chi.Mux {
 		r.Post("/", CreateToDo)
 		r.Get("/{id}", GetToDo)
 		r.Patch("/{id}", UpdateToDo)
+		r.Delete("/{id}", DeleteToDo)
 
 	})
 
