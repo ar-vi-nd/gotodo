@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"log"
+	"os"
 	"time"
 
 	"go.mongodb.org/mongo-driver/mongo"
@@ -14,7 +15,11 @@ var TodoCollection *mongo.Collection
 
 func InitializeMongoDB() {
 	var err error
-	Client, err = mongo.NewClient(options.Client().ApplyURI("mongodb+srv://igaming:hCDmJeZUHD4mcm1y@cluster0.g5mbz7u.mongodb.net/igaming"))
+	uri := os.Getenv("MONGODB_URI")
+	if uri == "" {
+		log.Fatal("MONGODB_URI not set in .env file")
+	}
+	Client, err = mongo.NewClient(options.Client().ApplyURI(uri))
 	if err != nil {
 		log.Fatalf("Failed to create MongoDB client: %v", err)
 	}
