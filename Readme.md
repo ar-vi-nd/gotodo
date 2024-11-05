@@ -2,7 +2,7 @@
 
 1. Clone the repository:
 
-    git clone https://github.com/ar-vi-nd/todo-app.git
+    git clone https://github.com/ar-vi-nd/gotodo.git
 
 2. Install dependencies:
 
